@@ -2,6 +2,7 @@ const assert=require('node:assert/strict');
 exports.checkRelaySettings=async page=>{
  const origin=new URL(page.url()).origin,key='ui-fixture-'+ 'q'.repeat(48);
  await page.goto(origin+'/#settings');
+ await page.getByRole('tab',{name:'Máy ảo / Relay',exact:true}).click();
  const panel=page.getByRole('region',{name:'Kết nối Chrome máy ảo',exact:true});
  // section has an explicit accessible name and is exposed as a region.
  await panel.waitFor();const mode=panel.getByLabel('Phương thức kết nối Chrome',{exact:true});
