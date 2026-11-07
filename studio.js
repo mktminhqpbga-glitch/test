@@ -355,10 +355,30 @@ export async function mountStudio(host, id) {
     const query = addSearch.value.trim().toLocaleLowerCase("vi");
     for (const item of addOptions.querySelectorAll("button")) item.hidden = Boolean(item.dataset.search) && !item.dataset.search.includes(query);
   };
-  addMenu.onpointerenter = event => { if (event.pointerType !== "touch") addMenu.open = true; };
-  addMenu.onpointerleave = event => { if (event.pointerType !== "touch") addMenu.open = false; };
-  addToggle.onclick = event => { event.preventDefault(); addMenu.open = true; };
-  addMenu.ontoggle = () => { addToggle.textContent = addMenu.open ? "×" : "＋"; };
+  // The menu is offset above its trigger: closing immediately on pointerleave
+  // made the panel flash and prevented clicking its buttons across the gap.
+  let addPinned = false, addCloseTimer = null;
+  addMenu.onpointerenter = event => {
+    if (event.pointerType === "touch") return;
+    clearTimeout(addCloseTimer);
+    addMenu.open = true;
+  };
+  addMenu.onpointerleave = event => {
+    if (event.pointerType === "touch" || addPinned) return;
+    clearTimeout(addCloseTimer);
+    addCloseTimer = setTimeout(() => { if (!addPinned) addMenu.open = false; }, 220);
+  };
+  addToggle.onclick = event => {
+    event.preventDefault();
+    clearTimeout(addCloseTimer);
+    if (addPinned) { addPinned = false; addMenu.open = false; }
+    else { addPinned = true; addMenu.open = true; }
+  };
+  addMenu.ontoggle = () => {
+    if (!addMenu.open) addPinned = false;
+    addToggle.textContent = addMenu.open ? "×" : "＋";
+  };
+  abort.signal.addEventListener('abort', () => clearTimeout(addCloseTimer), {once:true});
   addMenu.append(addToggle, addOptions);
   const select = button(
     "",
