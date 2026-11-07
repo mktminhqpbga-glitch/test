@@ -19,6 +19,7 @@ import {
   list,
   read,
   write,
+  mutate,
   remove,
   addAsset,
   readAsset,
@@ -44,6 +45,7 @@ const repo = new ProjectRepository(),
     results: "Kết quả",
     prompts: "Prompt",
     templates: "Luồng mẫu",
+    favorites: "Yêu thích",
   };
 export async function mountLibrary(host) {
   let category = "inputs",
@@ -67,7 +69,7 @@ export async function mountLibrary(host) {
     ["audio", "Âm thanh"],
   ])
     filter.add(new Option(l, v));
-  const tools = el("div", undefined, "project-actions"),
+  const tools = el("div", undefined, "library-toolbar"),
     cards = el("div", undefined, "library-grid");
   const uploader = el("input");
   uploader.type = "file";
@@ -83,7 +85,7 @@ export async function mountLibrary(host) {
     }
     uploader.value = "";
   };
-  const create = button("＋ Tải đầu vào", () => uploader.click());
+  const create = button("＋ Thêm tệp", () => uploader.click(), "library-upload-action");
   tools.append(search, filter, create, uploader);
   host.replaceChildren(top, tabs, tools, cards);
   for (const [key, label] of Object.entries(titles)) {
@@ -107,15 +109,18 @@ export async function mountLibrary(host) {
   let revision = 0;
   async function render() {
     const seq = ++revision,
-      items = await list(category);
+      items = category === 'favorites'
+        ? (await Promise.all(['inputs', 'results', 'prompts', 'templates'].map(async store =>
+            (await list(store)).filter(item => item.favorite).map(item => ({...item, __store: store}))
+          ))).flat()
+        : (await list(category)).map(item => ({...item, __store: category}));
     if (!alive || seq !== revision) return;
     for (const url of urls) URL.revokeObjectURL(url);
     urls = [];
     cards.replaceChildren();
-    filter.hidden = !["inputs", "results"].includes(category);
+    filter.hidden = !["inputs", "results", "favorites"].includes(category);
     create.hidden = category !== "inputs" && category !== "prompts";
-    create.textContent =
-      category === "inputs" ? "＋ Tải đầu vào" : "＋ Lưu prompt";
+    create.textContent = category === "inputs" ? "＋ Thêm tệp" : "＋ Lưu prompt";
     create.onclick = async () => {
       if (category === "inputs") uploader.click();
       else promptDialog(null);
@@ -130,40 +135,47 @@ export async function mountLibrary(host) {
       .filter(
         (a) =>
           a.name.toLowerCase().includes(query) &&
-          (!["inputs", "results"].includes(category) ||
+          (!["inputs", "results", "favorites"].includes(category) ||
             kind === "all" ||
             a.kind === kind),
       )) {
+      const itemStore = item.__store;
       const card = el("article", undefined, "library-card");
+      const preview = el("div", undefined, "library-card-preview");
       if (item.blob) {
-        const visual = el(item.kind === "image" ? "img" : item.kind);
-        visual.src = URL.createObjectURL(item.blob);
-        urls.push(visual.src);
-        if (item.kind !== "image") {
-          visual.controls = true;
-          visual.preload = "metadata";
-        } else visual.alt = item.name;
-        card.append(visual);
-      } else
-        card.append(
-          el(
-            "p",
-            category === "prompts"
-              ? item.text
-              : (item.graph?.nodes.length || 0) +
-                  " node · " +
-                  (item.graph?.edges.length || 0) +
-                  " dây",
-            "library-text",
-          ),
-        );
+        const mediaURL = URL.createObjectURL(item.blob);
+        urls.push(mediaURL);
+        if (item.kind === 'audio') {
+          const artwork = el('div', undefined, 'library-audio-cover');
+          artwork.append(icon('music'), el('span', 'ÂM THANH'));
+          preview.append(artwork);
+          const player = el('audio');
+          player.src = mediaURL;
+          player.controls = true;
+          player.preload = 'metadata';
+          card.append(preview, player);
+        } else {
+          const visual = el(item.kind === "image" ? "img" : "video");
+          visual.src = mediaURL;
+          if (item.kind !== "image") {
+            visual.controls = true;
+            visual.preload = "metadata";
+          } else visual.alt = item.name;
+          preview.append(visual);
+          card.append(preview);
+        }
+      } else {
+        preview.append(el('p', itemStore === 'prompts' ? item.text :
+          (item.graph?.nodes.length || 0) + ' node · ' + (item.graph?.edges.length || 0) + ' dây', 'library-text'));
+        card.append(preview);
+      }
       card.append(el("strong", item.name));
-      const actions = el("div", undefined, "project-actions");
+      const actions = el("div", undefined, "project-actions library-card-actions");
       actions.append(
         button("Đổi tên", () => {
           const next = prompt("Tên mới", item.name);
           if (next?.trim()) {
-            return write(category, {
+            return write(itemStore, {
               ...item,
               name: next.trim().slice(0, 100),
             }).then(render);
@@ -195,7 +207,7 @@ export async function mountLibrary(host) {
             setTimeout(() => URL.revokeObjectURL(a.href), 1000);
           }),
         );
-      if (category === "prompts")
+      if (itemStore === "prompts")
         actions.append(button("Sửa prompt", () => promptDialog(item)));
       actions.append(
         button("Xóa", async () => {
@@ -226,14 +238,39 @@ export async function mountLibrary(host) {
             }
           }
           if (
-            !confirm("Xóa “" + item.name + "” khỏi " + titles[category] + "?")
+            !confirm("Xóa “" + item.name + "” khỏi " + titles[itemStore] + "?")
           )
             return;
-          await remove(category, item.id);
+          await remove(itemStore, item.id);
           await render();
         }),
       );
-      card.append(actions);
+      const favorite = button('', async () => {
+        const saved = await mutate(itemStore, item.id, current => {
+          if (!current) throw Error('Tệp không còn trong Kho.');
+          return {...current, favorite: !current.favorite};
+        });
+        item.favorite = !!saved.favorite;
+        updateFavorite();
+        if (category === 'favorites') await render();
+      }, 'library-favorite');
+      const heart = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      heart.setAttribute('viewBox', '0 0 24 24');
+      heart.setAttribute('aria-hidden', 'true');
+      const shape = document.createElementNS(heart.namespaceURI, 'path');
+      shape.setAttribute('d', 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0l-1 1-1-1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.7 8.8-8.7a5.5 5.5 0 0 0 0-7.8z');
+      heart.append(shape);
+      favorite.append(heart);
+      function updateFavorite() {
+        favorite.classList.toggle('is-favorite', !!item.favorite);
+        favorite.setAttribute('aria-pressed', String(!!item.favorite));
+        favorite.setAttribute('aria-label', (item.favorite ? 'Bỏ thích ' : 'Thích ') + item.name);
+        favorite.title = item.favorite ? 'Bỏ khỏi Yêu thích' : 'Thêm vào Yêu thích';
+      }
+      updateFavorite();
+      const footer = el('div', undefined, 'library-card-footer');
+      footer.append(actions, favorite);
+      card.append(footer);
       cards.append(card);
     }
     if (!cards.childNodes.length)
