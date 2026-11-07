@@ -97,7 +97,7 @@ export function button(text, fn, cls) {
   const b = el("button", text, cls);
   b.type = "button";
   let inFlight = false;
-  b.addEventListener("click", event => {
+  b.onclick = event => {
     if (inFlight) return;
     // Do not toggle disabled on every click: this caused all controls to flash,
     // lose hover/focus and sometimes interrupt their own menu actions.
@@ -117,7 +117,7 @@ export function button(text, fn, cls) {
     } catch (error) {
       notice(error?.message || "Thao tác không thành công.");
     }
-  });
+  };
   return b;
 }
 export async function copyText(value) {
