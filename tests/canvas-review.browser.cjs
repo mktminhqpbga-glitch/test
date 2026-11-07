@@ -326,6 +326,7 @@ const path = require('node:path'), os = require('node:os'), assert = require('no
     assert.equal(await page.getByLabel('Nội dung kịch bản', { exact: true }).count(), 1);
     for (let visit = 0; visit < 3; visit++) {
       await page.evaluate(() => { location.hash = '#settings'; });
+      await page.getByRole('tab', { name: 'Trợ lý AI', exact: true }).click();
       await page.getByLabel('Dịch vụ trợ lý AI', { exact: true }).waitFor();
       await page.evaluate(id => { location.hash = '#canvas/' + id; }, fixture.id);
       await page.locator('.cvn-node[data-id="image-target"]').waitFor();
@@ -337,6 +338,7 @@ const path = require('node:path'), os = require('node:os'), assert = require('no
       assert.equal(await page.getByText(/Dự án đã thay đổi ở tab khác/).count(), 0, 'opening metadata never conflicts with the previous save');
     }
     await page.goto(url + '/#settings');
+    await page.getByRole('tab', { name: 'Trợ lý AI', exact: true }).click();
     await page.getByLabel('Dịch vụ trợ lý AI', { exact: true }).selectOption('grok');
     await page.getByRole('button', { name: 'Cập nhật tab trợ lý', exact: true }).click();
     await page.getByLabel('Tab dành riêng cho trợ lý AI', { exact: true }).selectOption('8');
@@ -381,6 +383,7 @@ const path = require('node:path'), os = require('node:os'), assert = require('no
     assert.equal(assistantRequests, 1);
     await page.locator('.cvn-resource-sheet').getByRole('button', { name: 'Đóng', exact: true }).click();
     await page.goto(url + '/#settings');
+    await page.getByRole('tab', { name: 'Trợ lý AI', exact: true }).click();
     await page.getByRole('button', { name: 'Bỏ tab trợ lý', exact: true }).click();
     const released = await page.evaluate(async () => { const { api } = await import('./client-api.js'); return api('tabs?provider=grok'); });
     assert.deepEqual(released.map(tab => tab.id), [8, 9]);
