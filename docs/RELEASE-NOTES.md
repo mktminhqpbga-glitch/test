@@ -1,3 +1,11 @@
+# 0.5.2 · Sửa nút nháy, Cài đặt ngang và Kho Yêu thích
+
+- Cài đặt theo menu ngang, chỉ một nhóm kết nối xuất hiện mỗi lần, giữ trạng thái nhập khi chuyển mục.
+- Xử lý lỗi nút bị làm mờ/nháy sau click: không vô hiệu hóa vô điều kiện cho các nút dùng chung; chặn lặp thao tác async mà không mất focus.
+- Sao chép nội dung/mã ghép có IPC clipboard an toàn trong Electron và fallback trình duyệt. Nút áp dụng kết quả hậu kỳ đợi callback hoàn thành mới đóng; popup Thêm node không tự đóng khi rê qua khoảng trống.
+- Kho có bố cục thẻ đồng bộ, biểu tượng nhạc cho audio/MP3, nút Thêm tệp đẹp, nút trái tim góc dưới phải và mục Yêu thích lưu bền vững trong IndexedDB.
+- Thêm bài kiểm thử Chromium click/copy/menu/Kho/Yêu thích và chạy trong `npm run test:all`. Không tuyên bố thử xong trên máy Ventura của người dùng, hay chạy AI thật, chỉ dựa vào fixture.
+
 # 0.5.1 · Sửa gửi/nhận ChatGPT Chrome và nút mẫu
 
 - Gửi rõ tỷ lệ, độ phân giải và chất lượng đã chọn trong prompt của mọi tab AI; giữ chỉ dẫn máy ảnh/ống kính/mẫu.

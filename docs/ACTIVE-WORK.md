@@ -1,9 +1,17 @@
-# Công việc hiện tại · MooZ CVN 0.5.1 (repo test)
+# Công việc hiện tại · MooZ CVN 0.5.2 (repo test)
+
+## Cập nhật 0.5.2 · Cài đặt, Kho và thao tác nút
+
+- **Cài đặt:** thanh lựa chọn ngang riêng cho Chrome & tab, Relay máy ảo, API AI, API khác, Trợ lý AI, Ứng dụng và Chẩn đoán. Chuyển mục chỉ ẩn/hiện panel, không dựng lại form hoặc xóa nội dung đang nhập.
+- **Khắc phục nút nháy:** nút đồng bộ không tự chuyển sang disabled sau mỗi click; các thao tác async được chặn trùng bằng cờ nội bộ thay vì làm mất focus. Nút Dùng kết quả chỉ đóng sau khi callback áp dụng thành công. Menu Thêm node giữ mở khi rê qua khe giữa trigger và bảng.
+- **Sao chép:** desktop hỗ trợ clipboard qua IPC được xác thực; web có kiểm tra clipboard và fallback. Không tự báo sao chép thành công khi lệnh thất bại.
+- **Kho:** thẻ ảnh/video/audio đồng nhất; MP3/âm thanh có biểu tượng nốt nhạc, audio vẫn phát được; nút Thêm tệp riêng; trái tim ở cuối thẻ và mục Yêu thích. Trạng thái thích và danh mục Kho được lưu qua tải lại.
+- **Kiểm thử:** bổ sung `tests/settings-library.browser.cjs` chạy Chromium với máy chủ thật, kiểm click/clipboard, menu Cài đặt, video/ảnh/audio, yêu thích và thao tác file. CI Mac Intel phải qua toàn bộ `test:all`, kiểm app đã đóng gói, rồi mới publish. Kiểm thử tài khoản AI thật và máy Ventura của người dùng vẫn chưa được chứng nhận.
 
 ## Điểm tiếp tục
 Mã nguồn được sao chép nguyên trạng từ `mktminhqpbga-glitch/App-MooZ-Workflow` nhánh `main`, commit `c922c8cde98eb42f006b44351829eae01a50e5f4`, sang repo `mktminhqpbga-glitch/test` ngày 2026-11-07. Repo nguồn giữ nguyên. File workflow build Mac được bổ sung riêng vì workflow permission của GitHub; toàn bộ file nguồn khác được đối chiếu SHA và giống bản gốc trước khi sửa tài liệu này.
 
-**Bản đang làm: 0.5.1**, không phải 0.5.0 như ghi chú cũ. Xem `APP-AUDIT-0.5.0.md`, `APP-AUDIT-0.5.1.md`, `RELEASE-NOTES.md` và `USER-REQUEST-REVIEW.md`.
+**Bản gốc tham chiếu: 0.5.1; bản đang làm tại test: 0.5.2**, không phải 0.5.0 như ghi chú cũ. Xem `APP-AUDIT-0.5.0.md`, `APP-AUDIT-0.5.1.md`, `RELEASE-NOTES.md` và `USER-REQUEST-REVIEW.md`.
 
 ## Đã triển khai, nhưng chưa được chứng nhận bằng tài khoản AI thật
 - Tạo ảnh/video hàng loạt, queue có checkpoint, Canvas và Kho, workflow đa cảnh, Phòng dựng/hậu kỳ, extension MooZ Connect 1.9.3.
