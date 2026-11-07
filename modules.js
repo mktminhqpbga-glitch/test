@@ -48,7 +48,10 @@ const repo = new ProjectRepository(),
     favorites: "Yêu thích",
   };
 export async function mountLibrary(host) {
-  let category = "inputs",
+  let category = (() => {
+      try { const value = sessionStorage.getItem('mooz-library-category'); return Object.hasOwn(titles, value) ? value : 'inputs'; }
+      catch { return 'inputs'; }
+    })(),
     kind = "all",
     query = "",
     alive = true,
@@ -91,6 +94,7 @@ export async function mountLibrary(host) {
   for (const [key, label] of Object.entries(titles)) {
     const b = button(label, async () => {
       category = key;
+      try { sessionStorage.setItem('mooz-library-category', key); } catch {}
       query = "";
       search.value = "";
       await render();
