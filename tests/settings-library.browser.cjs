@@ -84,6 +84,7 @@ const os=require('node:os'),path=require('node:path'),assert=require('node:asser
   await page.getByRole('button',{name:'Thích my-image.png',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'Bỏ thích my-image.png',exact:true}).getAttribute('aria-pressed'),'true');
   await page.getByRole('button',{name:'Yêu thích',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelectorAll('.library-card').length===1);
   assert.equal(await cards.count(),1);
   await page.reload();
   await page.getByRole('button',{name:'Bỏ thích my-image.png',exact:true}).waitFor();
