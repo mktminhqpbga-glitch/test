@@ -525,7 +525,7 @@ export async function mountSettings(host) {
       const value = await api('status');
       if (!host.isConnected) return;
       status.textContent = value.chrome.connected ? 'Chrome đã kết nối · ' + (value.chrome.mode || 'local')
-        : 'Chrome chưa kết nối' + (value.chrome.remoteConfigured ? ' · Đã cấu hình relay' : '');
+        : 'Chrome chưa ghép' + (value.chrome.remoteConfigured ? ' · Đã cấu hình relay' : '');
       cards.replaceChildren();
       for (const item of value.providers || []) {
         cards.append(el('p', item.name + ' · ' + (item.ready ? 'Đã sẵn sàng' : 'Chưa cấu hình')));
