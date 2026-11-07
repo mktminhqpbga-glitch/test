@@ -11,7 +11,7 @@ const path = require('node:path'), os = require('node:os'), assert = require('no
  assert.equal(await page.evaluate(()=>!!window.moozDesktop?.accessCode),true);
  assert.equal(await page.evaluate(()=>window.moozDesktop.version),require('../package.json').version);
  const status=await page.evaluate(async()=>{const {api}=await import('./client-api.js');return api('status');});assert.ok(status.chrome);
- await page.goto('http://127.0.0.1:17474/#settings');await page.getByText('Ứng dụng & extension',{exact:true}).waitFor();
+ await page.goto('http://127.0.0.1:17474/#settings');await page.getByRole('tab',{name:'Ứng dụng',exact:true}).click();await page.getByRole('heading',{name:'Ứng dụng và tiện ích MooZ Connect',exact:true}).waitFor();
  const saved=path.join(profile,'MooZ-Connect.zip');
  await application.evaluate(({BrowserWindow},target)=>{globalThis.moozDownloadPromise=new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Native download did not finish')),15000);BrowserWindow.getAllWindows()[0].webContents.session.once('will-download',(_event,item)=>{item.setSavePath(target);item.once('done',(_event,state)=>{clearTimeout(timer);resolve(state);});});});return true;},saved);
  await page.locator('.app-downloads').getByRole('link',{name:/Tải MooZ Connect/}).click();
