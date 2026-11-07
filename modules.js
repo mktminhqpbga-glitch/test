@@ -14,7 +14,7 @@ import {
 } from "./core/capabilities.js";
 import { editImage, captureFrame } from "./media-tools.js";
 import { nodeAssetIds } from "./core/references.js";
-import { el, button, notice, api, providerList, connectedAI } from "./client-api.js";
+import { el, button, notice, api, providerList, connectedAI, copyText } from "./client-api.js";
 import {
   list,
   read,
@@ -295,164 +295,209 @@ export async function mountLibrary(host) {
   };
 }
 export async function mountSettings(host) {
-  host.replaceChildren(
-    el("h1", "Cài đặt"),
-    el(
-      "p",
-      "Quản lý giao diện, không gian cá nhân và kết nối AI.",
-      "intro",
-    ),
-  );
-  const preferences = el("section", undefined, "settings-panel workspace-preferences"),
-    identity = el("div", undefined, "workspace-identity"),
-    appearanceLink = el("a", "Tùy chỉnh giao diện →", "workspace-appearance-link");
-  identity.append(el("span", "M", "avatar"), el("span", "Không gian cá nhân"));
-  appearanceLink.href = "#appearance";
-  preferences.append(el("h2", "Không gian và giao diện"), identity, appearanceLink);
-  host.append(preferences);
-  mountAssistantSettings(host);
-  const cleanupAPI=mountAPISettings(host);
-  const cleanupCustom=mountCustomProviders(host);
-  const cleanupMaintenance=mountMaintenance(host);
+  const menu = [
+    ['chrome', 'Chrome & tab AI'],
+    ['relay', 'Máy ảo / Relay'],
+    ['api', 'API AI'],
+    ['custom', 'API khác'],
+    ['assistant', 'Trợ lý AI'],
+    ['downloads', 'Ứng dụng'],
+    ['maintenance', 'Chẩn đoán'],
+  ];
+  const heading = el('div', undefined, 'settings-intro');
+  heading.append(el('h1', 'Cài đặt'), el('p', 'Chọn một kết nối hoặc nhóm cài đặt ở thanh ngang. Các thay đổi được lưu riêng trên máy.', 'intro'));
+  const nav = el('nav', undefined, 'settings-tabs');
+  nav.setAttribute('aria-label', 'Danh mục kết nối và cài đặt');
+  nav.setAttribute('role', 'tablist');
+  const stage = el('div', undefined, 'settings-stage'), sections = new Map(), buttons = new Map();
+  for (const [id, title] of menu) {
+    const tab = el('button', title, 'settings-tab');
+    tab.type = 'button';
+    tab.id = 'settings-tab-' + id;
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-controls', 'settings-panel-' + id);
+    const section = el('div', undefined, 'settings-section');
+    section.id = 'settings-panel-' + id;
+    section.setAttribute('role', 'tabpanel');
+    section.setAttribute('aria-labelledby', tab.id);
+    section.hidden = true;
+    tab.onclick = () => activate(id);
+    nav.append(tab);
+    stage.append(section);
+    sections.set(id, section);
+    buttons.set(id, tab);
+  }
+  const appearance = el('a', 'Giao diện', 'settings-appearance-link');
+  appearance.href = '#appearance';
+  nav.append(appearance);
+  host.replaceChildren(heading, nav, stage);
+  function activate(id) {
+    if (!sections.has(id)) id = 'chrome';
+    for (const [key, section] of sections) {
+      const active = key === id;
+      section.hidden = !active;
+      buttons.get(key).setAttribute('aria-selected', String(active));
+      buttons.get(key).tabIndex = active ? 0 : -1;
+    }
+    try { sessionStorage.setItem('mooz-settings-tab', id); } catch {}
+  }
+  nav.onkeydown = event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const index = menu.findIndex(([id]) => buttons.get(id) === document.activeElement);
+    if (index < 0) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? menu.length - 1
+      : (index + (event.key === 'ArrowRight' ? 1 : -1) + menu.length) % menu.length;
+    activate(menu[next][0]);
+    buttons.get(menu[next][0]).focus();
+  };
+  let selected = 'chrome';
+  try { selected = sessionStorage.getItem('mooz-settings-tab') || 'chrome'; } catch {}
+  activate(selected);
+  const cleanupAPI = mountAPISettings(sections.get('api'));
+  const cleanupCustom = mountCustomProviders(sections.get('custom'));
+  const cleanupMaintenance = mountMaintenance(sections.get('maintenance'));
+  mountAssistantSettings(sections.get('assistant'));
+  const cleanupRelay = mountRelaySettings(sections.get('relay'), { onChanged: () => {
+    code.value = '';
+    code.hidden = true;
+    copyCode.hidden = true;
+    return refresh();
+  } });
   const downloads = el('section', undefined, 'settings-panel app-downloads');
-  downloads.append(el('h2','Ứng dụng & extension'));
-  const installed = el('p', globalThis.moozDesktop ? 'MooZ CVN ' + globalThis.moozDesktop.version + ' · ' + globalThis.moozDesktop.platform + ' ' + globalThis.moozDesktop.arch : 'Bạn đang dùng bản web. Bản desktop có máy chủ kết nối AI local.');
-  const extension = el('a','Tải MooZ Connect mới nhất'), mac = el('a','Tải ứng dụng macOS Intel'), releaseState = el('p','Đang kiểm tra phiên bản phát hành…');
-  extension.href='/downloads/MooZ-Connect.zip'; extension.download='MooZ-Connect.zip';
-  mac.href='https://github.com/mktminhqpbga-glitch/App-MooZ-Workflow/releases/latest'; mac.target='_blank'; mac.rel='noopener';
-  downloads.append(installed,extension,mac,releaseState,el('p','Mac Intel (x64). Bản chưa ký/notarize cần được xác nhận mở trong macOS. Extension: giải nén → Chrome → Extensions → Developer mode → Load unpacked.'));
-  host.append(downloads);
-  void fetch('/downloads/release.json').then(response=>{if(!response.ok)throw Error('Không đọc được phiên bản');return response.json();}).then(info=>{extension.textContent='Tải MooZ Connect '+info.extensionVersion;releaseState.textContent='Mã nguồn app '+info.appVersion+' · bản Mac công khai xem trên trang phát hành.';}).catch(()=>{releaseState.textContent='Mở trang phát hành để xem gói Mac hiện có.';});
-  void fetch('https://api.github.com/repos/mktminhqpbga-glitch/App-MooZ-Workflow/releases/latest').then(response=>{if(!response.ok)throw Error('Chưa có release');return response.json();}).then(release=>{const asset=release.assets?.find(asset=>asset.name==='MooZ-CVN-macOS-Intel.zip');if(asset&&asset.browser_download_url.startsWith('https://github.com/')){mac.href=asset.browser_download_url;mac.textContent='Tải macOS Intel · '+release.tag_name;releaseState.textContent='Bản phát hành: '+release.tag_name;}}).catch(()=>{});
-
-  const cleanupRelay = mountRelaySettings(host, {onChanged: () => { code.value="";code.hidden=true;return refresh(); }});
-  const panel = el("section", undefined, "settings-panel"),
-    status = el("p", "Đang kiểm tra máy chủ…"),
-    code = el("textarea");
+  downloads.append(el('h2', 'Ứng dụng và tiện ích MooZ Connect'));
+  const installed = el('p', globalThis.moozDesktop
+    ? 'MooZ CVN ' + globalThis.moozDesktop.version + ' · ' + globalThis.moozDesktop.platform + ' ' + globalThis.moozDesktop.arch
+    : 'Bạn đang dùng bản web. Bản desktop có máy chủ kết nối AI cục bộ.');
+  const links = el('div', undefined, 'settings-download-links');
+  const extension = el('a', 'Tải MooZ Connect', 'settings-download-action');
+  const mac = el('a', 'Tải ứng dụng macOS Intel', 'settings-download-action');
+  const releaseState = el('p', 'Đang kiểm tra bản phát hành…', 'intro');
+  extension.href = '/downloads/MooZ-Connect.zip';
+  extension.download = 'MooZ-Connect.zip';
+  mac.href = 'https://github.com/mktminhqpbga-glitch/test/releases/latest';
+  mac.target = '_blank';
+  mac.rel = 'noopener noreferrer';
+  links.append(extension, mac);
+  downloads.append(installed, links, releaseState,
+    el('p', 'Cài tiện ích: tải ZIP, giải nén → Chrome Extensions → Developer mode → Load unpacked. Trên macOS Intel, tải DMG từ release mới nhất.', 'intro'));
+  sections.get('downloads').append(downloads);
+  void fetch('/downloads/release.json').then(r => {
+    if (!r.ok) throw Error('Không đọc được phiên bản');
+    return r.json();
+  }).then(info => {
+    if (!host.isConnected) return;
+    extension.textContent = 'Tải MooZ Connect ' + info.extensionVersion;
+    releaseState.textContent = 'Phiên bản mã nguồn ' + info.appVersion;
+  }).catch(() => { if (host.isConnected) releaseState.textContent = 'Bản Mac công khai có trên trang phát hành.'; });
+  void fetch('https://api.github.com/repos/mktminhqpbga-glitch/test/releases/latest').then(r => {
+    if (!r.ok) throw Error('Chưa có release');
+    return r.json();
+  }).then(release => {
+    if (!host.isConnected) return;
+    const asset = release.assets?.find(item => item.name === 'MooZ-CVN-macOS-Intel.dmg');
+    if (asset?.browser_download_url?.startsWith('https://github.com/')) {
+      mac.href = asset.browser_download_url;
+      mac.textContent = 'Tải DMG Intel · ' + release.tag_name;
+      releaseState.textContent = 'Bản phát hành: ' + release.tag_name;
+    }
+  }).catch(() => {});
+  const panel = el('section', undefined, 'settings-panel chrome-settings');
+  const status = el('p', 'Đang kiểm tra Chrome…', 'settings-connection-status');
+  const code = el('textarea'), access = el('input'), cards = el('div'), actions = el('div', undefined, 'settings-actions');
   code.readOnly = true;
   code.hidden = true;
-  code.setAttribute("aria-label", "Mã ghép Chrome");
-  const access = el("input");
-  access.type = "password";
-  access.placeholder = "Mã truy cập máy chủ (nếu có)";
-  access.setAttribute("aria-label", "Mã truy cập máy chủ");
-  const cards = el("div");
-  panel.append(
-    el("h2", "Máy chủ và Chrome"),
-    status,
-    access,
-    button("Lưu mã truy cập phiên này", () => {
-      sessionStorage.setItem("mooz-server-access", access.value);
-      access.value = "";
-      return refresh();
-    }),
-    button("Kiểm tra kết nối", refresh),
-    button("Tạo mã ghép Chrome", async () => {
-      const pair = await api("chrome/pair", {});
+  code.setAttribute('aria-label', 'Mã ghép Chrome');
+  access.type = 'password';
+  access.placeholder = 'Mã truy cập máy chủ (nếu có)';
+  access.setAttribute('aria-label', 'Mã truy cập máy chủ');
+  const copyCode = button('Sao chép mã', async () => {
+    await copyText(code.value);
+    notice('Đã sao chép mã ghép Chrome.');
+  });
+  copyCode.hidden = true;
+  actions.append(
+    button('Kiểm tra kết nối', refresh),
+    button('Tạo mã ghép Chrome', async () => {
+      const pair = await api('chrome/pair', {});
       code.value = pair.uri;
       code.hidden = false;
-      notice(pair.note || "Mã ghép có hạn. Dán vào MooZ Connect.");
+      copyCode.hidden = false;
+      status.textContent = pair.note || 'Đã tạo mã ghép. Dán vào MooZ Connect trong Chrome.';
     }),
-    code,
-    button("Sao chép mã", async () => {
-      if (!code.value) throw Error("Tạo mã ghép trước.");
-      await navigator.clipboard.writeText(code.value);
-      notice("Đã sao chép mã ghép");
-    }),
-    button("Ngắt kết nối", async () => {
-      if (confirm("Ngắt phiên Chrome? Lượt đang gửi cần được đối chiếu.")) {
-        await api("chrome/disconnect", {});
-        code.value = "";
-        code.hidden = true;
-        await refresh();
-      }
+    copyCode,
+    button('Ngắt kết nối', async () => {
+      if (!confirm('Ngắt Chrome? Các lượt chưa rõ kết quả cần được đối chiếu trước khi gửi lại.')) return;
+      await api('chrome/disconnect', {});
+      code.value = '';
+      code.hidden = copyCode.hidden = true;
+      await refresh();
     }),
   );
-  const link = el("a", "Tải MooZ Connect 1.9.2", "back");
-  link.href = "/downloads/MooZ-Connect.zip";
-  panel.append(
-    link,
-    el(
-      "p",
-      "Cài tiện ích bằng Load unpacked, dán mã ghép, mở tab AI và đăng nhập. Kết nối local chỉ dùng khi Chrome và máy chủ Node chạy cùng máy; máy chủ cloud cần relay WSS.",
-      "intro",
-    ),
-    el("h2", "AI qua API"),
-    cards,
-  );
-  const provider = el("select"),
-    tab = el("select");
-  provider.setAttribute("aria-label", "AI cần kiểm tra");
-  tab.setAttribute("aria-label", "Tab cần kiểm tra");
-  for (const p of providerList.filter(
-    (p) => !isAPIProvider(p.id),
-  ))
-    provider.add(new Option(p.name, p.id));
-  async function refreshTabs() {
-    tab.replaceChildren(new Option("Chọn tab…", ""));
-    for (const t of await api("tabs?provider=" + provider.value)) {
-      const o = new Option(t.title || t.url, t.id);
-      o.dataset.url = t.url;
-      tab.add(o);
-    }
-  }
-  provider.onchange = () => void refreshTabs().catch((e) => notice(e.message));
-  panel.append(
-    el("h2", "Kiểm tra tab AI"),
-    provider,
-    tab,
-    button("Cập nhật tab", refreshTabs),
-    button("Kiểm tra và tiếp tục", async () => {
-      if (!tab.value) throw Error("Chọn tab trước.");
-      await api("chrome/resume", {
+  const accessDetails = el('details', undefined, 'settings-advanced');
+  const saveAccess = button('Lưu mã truy cập phiên này', () => {
+    sessionStorage.setItem('mooz-server-access', access.value);
+    access.value = '';
+    return refresh();
+  });
+  accessDetails.append(el('summary', 'Mã truy cập máy chủ và tùy chọn nâng cao'), access, saveAccess);
+  const capabilities = el('details', undefined, 'settings-advanced');
+  capabilities.append(el('summary', 'Trạng thái API và các công cụ nâng cao'), cards);
+  const provider = el('select'), tab = el('select');
+  provider.setAttribute('aria-label', 'AI cần kiểm tra');
+  tab.setAttribute('aria-label', 'Tab cần kiểm tra');
+  for (const item of providerList.filter(item => !isAPIProvider(item.id))) provider.add(new Option(item.name, item.id));
+  const tabControls = el('div', undefined, 'settings-tab-controls');
+  tabControls.append(provider, tab,
+    button('Cập nhật tab', refreshTabs),
+    button('Kiểm tra và tiếp tục', async () => {
+      if (!tab.value) throw Error('Chọn tab AI trước.');
+      await api('chrome/resume', {
         provider: provider.value,
         tabId: Number(tab.value),
         chatURL: tab.selectedOptions[0]?.dataset.url,
       });
-      notice("Tab đã sẵn sàng. Không tự gửi lại các lượt cũ.");
-    }),
+      status.textContent = 'Tab đã sẵn sàng. Không tự gửi lại yêu cầu cũ.';
+    }));
+  async function refreshTabs() {
+    tab.replaceChildren(new Option('Chọn tab AI…', ''));
+    const available = await api('tabs?provider=' + provider.value);
+    if (!host.isConnected) return;
+    for (const item of available) {
+      const option = new Option(item.title || item.url, item.id);
+      option.dataset.url = item.url;
+      tab.add(option);
+    }
+    status.textContent = available.length ? 'Đã tìm thấy ' + available.length + ' tab ' + provider.selectedOptions[0]?.textContent + '.' : 'Chưa tìm thấy tab. Kiểm tra MooZ Connect và đăng nhập AI trong Chrome.';
+  }
+  provider.onchange = () => void refreshTabs().catch(error => { status.textContent = error.message; });
+  panel.append(
+    el('h2', 'Kết nối Chrome'), status,
+    el('p', 'Mở Chrome cùng máy, cài MooZ Connect, tạo mã ghép và chọn tab AI. Để dùng máy ảo, chuyển sang mục Máy ảo / Relay ở trên.', 'intro'),
+    actions, code,
+    el('h3', 'Tab AI đang kết nối'), tabControls,
+    accessDetails, capabilities,
   );
-  host.append(panel);
+  sections.get('chrome').append(panel);
   async function refresh() {
     try {
-      const s = await api("status");
+      const value = await api('status');
       if (!host.isConnected) return;
-      status.textContent = s.chrome.connected
-        ? "Chrome đã ghép · " + (s.chrome.mode || "local")
-        : "Chrome chưa ghép" +
-          (s.chrome.remoteConfigured
-            ? " · Relay đã cấu hình"
-            : " · Chưa cấu hình relay từ xa");
+      status.textContent = value.chrome.connected ? 'Chrome đã kết nối · ' + (value.chrome.mode || 'local')
+        : 'Chrome chưa kết nối' + (value.chrome.remoteConfigured ? ' · Đã cấu hình relay' : '');
       cards.replaceChildren();
-      for (const p of s.providers)
-        cards.append(
-          el(
-            "p",
-            p.name +
-              " · " +
-              (p.ready ? "Có khóa trên máy chủ" : "Chưa cấu hình khóa"),
-          ),
-        );
-      const available = readyOperations(s);
-      cards.append(el("h2", "Khả năng công cụ ảnh"));
-      for (const [operation, label] of Object.entries(advancedImageOperations))
-        cards.append(
-          el(
-            "p",
-            label +
-              " · " +
-              (available.has(operation)
-                ? "Kết nối đã khai báo hỗ trợ"
-                : "Chưa có kết nối hỗ trợ — ẩn trên canvas"),
-          ),
-        );
-      const sidebar = document.querySelector(".connection small");
-      if (sidebar)
-        sidebar.textContent = s.chrome.connected
-          ? "Chrome đã ghép"
-          : "Chưa ghép Chrome";
-    } catch (e) {
-      status.textContent = e.message;
+      for (const item of value.providers || []) {
+        cards.append(el('p', item.name + ' · ' + (item.ready ? 'Đã sẵn sàng' : 'Chưa cấu hình')));
+      }
+      const supported = readyOperations(value);
+      cards.append(el('h3', 'Công cụ ảnh'));
+      for (const [operation, label] of Object.entries(advancedImageOperations)) {
+        cards.append(el('p', label + ' · ' + (supported.has(operation) ? 'Đã khai báo hỗ trợ' : 'Chưa có kết nối hỗ trợ')));
+      }
+      const sidebar = document.querySelector('.connection small');
+      if (sidebar) sidebar.textContent = value.chrome.connected ? 'Chrome đã ghép' : 'Chưa ghép Chrome';
+    } catch (error) {
+      if (host.isConnected) status.textContent = error.message;
     }
   }
   await refresh();
@@ -461,9 +506,11 @@ export async function mountSettings(host) {
     cleanupAPI();
     cleanupCustom();
     cleanupMaintenance();
-    code.value = "";
+    code.value = '';
+    access.value = '';
   };
 }
+
 const labels = {
   queued: "Chờ lượt",
   preparing: "Chuẩn bị",
