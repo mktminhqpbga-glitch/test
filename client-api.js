@@ -96,15 +96,52 @@ export const el = (tag, text, cls) => {
 export function button(text, fn, cls) {
   const b = el("button", text, cls);
   b.type = "button";
-  b.onclick = async () => {
-    b.disabled = true;
+  let inFlight = false;
+  b.addEventListener("click", event => {
+    if (inFlight) return;
+    // Do not toggle disabled on every click: this caused all controls to flash,
+    // lose hover/focus and sometimes interrupt their own menu actions.
     try {
-      await fn();
-    } catch (e) {
-      notice(e.message);
-    } finally {
-      b.disabled = false;
+      const result = fn(event);
+      if (result && typeof result.then === "function") {
+        inFlight = true;
+        const busyTimer = setTimeout(() => {
+          if (b.isConnected) b.setAttribute("aria-busy", "true");
+        }, 300);
+        Promise.resolve(result).catch(error => notice(error?.message || "Thao tác không thành công.")).finally(() => {
+          clearTimeout(busyTimer);
+          b.removeAttribute("aria-busy");
+          inFlight = false;
+        });
+      }
+    } catch (error) {
+      notice(error?.message || "Thao tác không thành công.");
     }
-  };
+  });
   return b;
+}
+export async function copyText(value) {
+  const text = String(value ?? "");
+  if (!text) throw Error("Không có nội dung để sao chép.");
+  if (globalThis.moozDesktop?.copyText) {
+    await globalThis.moozDesktop.copyText(text);
+    return;
+  }
+  if (navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(text); return; } catch {}
+  }
+  const field = document.createElement("textarea");
+  const focused = document.activeElement;
+  field.value = text;
+  field.setAttribute("readonly", "");
+  Object.assign(field.style, { position: "fixed", top: "0", left: "0", opacity: "0", pointerEvents: "none" });
+  document.body.append(field);
+  field.focus();
+  field.select();
+  let copied = false;
+  try { copied = document.execCommand("copy"); } finally {
+    field.remove();
+    focused?.focus?.({ preventScroll: true });
+  }
+  if (!copied) throw Error("Không thể sao chép. Hãy chọn nội dung và dùng Cmd+C.");
 }

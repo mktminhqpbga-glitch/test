@@ -1,4 +1,4 @@
-const { app, BrowserWindow, utilityProcess, dialog, shell, Menu } = require('electron');
+const { app, BrowserWindow, utilityProcess, dialog, shell, Menu, ipcMain, clipboard } = require('electron');
 const path = require('node:path'), crypto = require('node:crypto');
 let server, window, quitting = false;
 if (process.env.MOOZ_DESKTOP_PROFILE) app.setPath('userData', process.env.MOOZ_DESKTOP_PROFILE);
@@ -6,6 +6,12 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
  app.on('second-instance', () => { if (window) { if(window.isMinimized())window.restore();window.focus(); } });
  app.whenReady().then(async () => {
+  ipcMain.handle('mooz:copy-text', (event, text) => {
+   if (!window || event.sender !== window.webContents) throw Error('Nguồn sao chép không hợp lệ.');
+   if (typeof text !== 'string' || text.length > 2_000_000) throw Error('Nội dung sao chép không hợp lệ.');
+   clipboard.writeText(text);
+   return true;
+  });
   const root = app.getAppPath(), token = crypto.randomBytes(32).toString('hex'), port = Number(process.env.MOOZ_DESKTOP_PORT || 4174);
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw Error('Cổng desktop không hợp lệ.');
   const origin = 'http://127.0.0.1:' + port;

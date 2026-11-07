@@ -17,15 +17,16 @@ const el = (tag, text, cls) => {
 const button = (text, fn) => {
   const b = el("button", text);
   b.type = "button";
-  b.onclick = async () => {
-    b.disabled = true;
+  let running = false;
+  b.onclick = event => {
+    if (running) return;
     try {
-      await fn();
-    } catch (e) {
-      notice(e.message);
-    } finally {
-      b.disabled = false;
-    }
+      const result = fn(event);
+      if (result && typeof result.then === "function") {
+        running = true;
+        Promise.resolve(result).catch(error => notice(error.message)).finally(() => { running = false; });
+      }
+    } catch (error) { notice(error.message); }
   };
   return b;
 };

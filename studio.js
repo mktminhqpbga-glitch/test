@@ -6,6 +6,7 @@ import {parseTabBinding} from './core/tab-binding.js';
 import { openDepthWorkbench } from "./depth-workbench.js";
 import { mergeJobOutputs, isStale } from "./core/output-state.js";
 import { openPostWorkbench } from "./post-workbench.js";
+import {copyText} from "./client-api.js";
 import { mountAssistantChat } from "./assistant-ui.js";
 import { nodeAssetIds, promptAssetIds } from "./core/references.js";
 import { availableImageTools } from "./core/capabilities.js";
@@ -154,7 +155,7 @@ export async function mountStudio(host, id) {
       controls.append(
         button("Mở workflow", () => { location.hash = "canvas/" + current.id; }),
         button("Sao chép", async () => {
-          await navigator.clipboard.writeText(exportProject(await repo.get(p.id)));
+          await copyText(exportProject(await repo.get(p.id)));
           notice("Đã sao chép JSON workflow; media gốc không nằm trong clipboard.");
         }),
         button("Nhân bản", async () => {
@@ -1243,7 +1244,7 @@ export async function mountStudio(host, id) {
       const edit = button("Sửa văn bản", () => card.querySelector('.cvn-node-body textarea')?.focus({ preventScroll: true })),
         split = button("Tách văn bản", () => {}),
         download = button("Tải .txt", () => downloadNode(current())),
-        copy = button("Sao chép", async () => { await navigator.clipboard.writeText(text()); notice("Đã sao chép văn bản"); }),
+        copy = button("Sao chép", async () => { await copyText(text()); notice("Đã sao chép văn bản"); }),
         duplicate = button("Nhân bản", () => duplicateNode(current()));
       bindInlinePopup(split, () => {
         resourcePanel("Tách văn bản");
@@ -2509,7 +2510,7 @@ if(n.data.stylePrompt||n.data.cameraPrompt){const applied=el("details",undefined
   }
   async function copyNode(node) {
     copiedNode = structuredClone(node);
-    try { await navigator.clipboard.writeText(JSON.stringify({ format: "mooz-cvn-node", node: copiedNode })); }
+    try { await copyText(JSON.stringify({ format: "mooz-cvn-node", node: copiedNode })); }
     catch { notice("Đã sao chép node trong Canvas. Trình duyệt chưa cho ghi clipboard hệ thống."); }
   }
   function pasteText(text, point) {
