@@ -56,13 +56,17 @@ const os=require('node:os'),path=require('node:path'),assert=require('node:asser
    observer.observe(b,{attributes:true,attributeFilter:['disabled']});
    b.click();b.click();b.click();
    await new Promise(resolve=>setTimeout(resolve,0));observer.disconnect();b.remove();
+   let originalHandler=0,overrideHandler=0;
+   const override=button('Special',()=>{originalHandler++;});
+   override.onclick=()=>{overrideHandler++;};
+   document.body.append(override);override.click();override.remove();
    const other=button('Asynchronous',()=>{asyncClicks++;return new Promise(resolve=>setTimeout(resolve,40));});
    document.body.append(other);other.click();other.click();
    await new Promise(resolve=>setTimeout(resolve,60));other.click();
    await new Promise(resolve=>setTimeout(resolve,60));other.remove();
-   return{clicks,changes,asyncClicks};
+   return{clicks,changes,asyncClicks,originalHandler,overrideHandler};
   });
-  assert.deepEqual(control,{clicks:3,changes:[],asyncClicks:2},'buttons must not blink disabled and async repeat is guarded');
+  assert.deepEqual(control,{clicks:3,changes:[],asyncClicks:2,originalHandler:0,overrideHandler:1},'buttons must not blink disabled and async repeat is guarded');
 
   await page.evaluate(async()=>{
    const {addAsset,write}=await import('./core/storage.js');
